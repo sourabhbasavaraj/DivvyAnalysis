@@ -1,0 +1,490 @@
+---
+title: "DPA Project"
+author: "Sourabh Sajjan"
+date: "2023-11-27"
+output: html_document
+---
+
+```{r}
+divQ1 <- read.csv('E:/DataSets/Divvy_Trips_2020_Q1.csv')
+divQ2 <- read.csv('E:/DataSets/Divvy_Trips_2019_Q2.csv')
+divQ3 <- read.csv('E:/DataSets/Divvy_Trips_2019_Q3.csv')
+divQ4 <- read.csv('E:/DataSets/Divvy_Trips_2019_Q4.csv')
+```
+
+
+```{r}
+head(divQ1)
+```
+
+
+```{r}
+#Step 1: Data preparation: 
+#In this step, the objective is to consolidate the data into a single, comprehensive dataset. However, before proceeding with the merging process, it is essential to examine the data to ensure that it is prepared for integration. 
+```
+
+
+```{r}
+colnames(divQ1)
+colnames(divQ2)
+colnames(divQ3)
+colnames(divQ4)
+```
+
+
+```{r}
+#We need to fix the columns as the datasets doesn't have a even consistency. Fixing this to have the same needed column names.
+```
+
+
+```{r}
+library(tidyverse)
+```
+
+
+```{r}
+#Renaming the different columns
+divQ1 <- rename(divQ1, 
+            trip_id = 'ride_id',
+            start_time = 'started_at',
+            end_time = 'ended_at',
+            from_station_id = 'start_station_id',
+            from_station_name = 'start_station_name',
+            to_station_id = 'end_station_id',
+            to_station_name = 'end_station_name',
+            usertype = 'member_casual')
+```
+
+
+```{r}
+divQ2 <- rename(divQ2, 
+            trip_id = 'X01...Rental.Details.Rental.ID',
+            start_time = 'X01...Rental.Details.Local.Start.Time',
+            end_time = 'X01...Rental.Details.Local.End.Time',
+            bikeid = 'X01...Rental.Details.Bike.ID',
+            tripduration = 'X01...Rental.Details.Duration.In.Seconds.Uncapped',
+            from_station_id = 'X03...Rental.Start.Station.ID',
+            from_station_name = 'X03...Rental.Start.Station.Name',
+            to_station_id = 'X02...Rental.End.Station.ID',
+            to_station_name = 'X02...Rental.End.Station.Name',
+            usertype = 'User.Type',
+            gender = 'Member.Gender',
+            birthyear = 'X05...Member.Details.Member.Birthday.Year')
+```
+
+
+```{r}
+#The column names are now matching 
+colnames(divQ1)
+colnames(divQ2)
+colnames(divQ3)
+colnames(divQ4)
+```
+
+
+```{r}
+#Inspecting the column to see if each column has the same data type
+str(divQ1)
+str(divQ2)
+str(divQ3)
+str(divQ4)
+```
+
+
+```{r}
+#Few columns are not in the same dataType. Fixing it 
+divQ2 <- mutate(divQ2, trip_id = as.character(trip_id))
+divQ3 <- mutate(divQ3, trip_id = as.character(trip_id))
+divQ4 <- mutate(divQ4, trip_id = as.character(trip_id), tripduration = as.character(tripduration))
+```
+
+
+```{r}
+divQ2 <- mutate(divQ2, start_time = as.POSIXct(start_time), end_time = as.POSIXct(end_time))
+divQ3 <- mutate(divQ3, start_time = as.POSIXct(start_time), end_time = as.POSIXct(end_time))
+divQ4 <- mutate(divQ4, start_time = as.POSIXct(start_time, format = '%m/%d/%Y %H:%M'), end_time = as.POSIXct(end_time, format = '%m/%d/%Y %H:%M'))
+divQ1 <- mutate(divQ1, start_time = as.POSIXct(start_time), end_time = as.POSIXct(end_time))
+```
+
+
+```{r}
+head(divQ1,2)
+head(divQ2,2)
+head(divQ3,2)
+head(divQ4,2)
+```
+
+
+```{r}
+#Merging the four datasets into 1
+dTrip <- bind_rows(divQ1,divQ2,divQ3,divQ4)
+head(dTrip,2)
+```
+
+
+```{r}
+#2. DATA CLEANING
+```
+
+
+```{r}
+colnames(dTrip)
+```
+
+
+```{r}
+#Taking columns which are only neccessary 
+dTrip <- select(dTrip, -c(bikeid, tripduration, rideable_type, start_lat, start_lng, end_lat, end_lng))
+head(dTrip,2)
+```
+
+
+```{r}
+#Checking whether we have right names
+table(dTrip$gender)
+table(dTrip$usertype)
+```
+
+
+```{r}
+#As observed, the 'gender' category includes values such as 'Female', 'Male', and empty cells. Similarly, the 'usertype' category encompasses 'casual', 'Customer', 'member', and 'Subscriber'.
+
+#In the year 2020, Divvy employed 'casual' and 'member' to denote user types, whereas in previous periods, 'Customer' and 'Subscriber' were utilized. For consistency, I will transform every occurrence of 'casual' to 'Customer' and 'member' to 'Subscriber' in the dataset.
+```
+
+
+```{r}
+dTrip <- mutate(dTrip, usertype = recode(usertype, 'casual' = 'Customer', 'member' = 'Subscriber'))
+```
+
+
+```{r}
+#Filling the null cells by NA
+dTrip$gender[dTrip$gender==""] <- NA
+```
+
+
+```{r}
+table(dTrip$gender)
+table(dTrip$usertype)
+```
+
+
+```{r}
+#It is necessary to generate additional columns for the trip duration, day of the week, and the month. The trip duration can be calculated by subtracting the 'start_time' from the 'end_time'.
+```
+
+
+```{r}
+dTrip <- mutate(dTrip, triplength = difftime( end_time, start_time, units = 'sec'), day = format(end_time, '%a'),
+               month = format(end_time, '%b'))
+head(dTrip,2)
+```
+
+
+```{r}
+dTrip$triplength <- as.numeric(dTrip$triplength)
+head(dTrip,2)
+```
+
+
+```{r}
+#New columns
+table(dTrip$day)
+table(dTrip$month)
+summary(dTrip$triplength)
+```
+```{r}
+#The days are not in order and there are negative values for the triplength. Need to fix this
+```
+
+
+```{r}
+dTrip <- dTrip %>% 
+  mutate(
+    day = ordered(day, levels = c('Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat')),
+    month = ordered(month, levels = c('Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'))
+  )
+
+```
+
+
+```{r}
+dTrip <- dTrip[!(dTrip$from_station_name == 'HQ QR' | dTrip$triplength < 0), ]
+```
+
+
+```{r}
+table(dTrip$day)
+table(dTrip$month)
+summary(dTrip$triplength)
+```
+
+
+```{r}
+#3. Exploratory Data Analysis
+```
+
+
+```{r}
+#1. What are the TOP 10 popular stations to begin a ride at?
+#-----------------------------------------------------------
+
+df_StartStation_Count <- dTrip %>%
+  count(from_station_name) %>%
+  rename(Counts = n)
+
+# Select the top 10 rows
+df_top10 <- head(df_StartStation_Count %>% arrange(desc(Counts)), 10)
+
+# Print the resulting data frame
+print(df_top10)
+
+```
+
+
+```{r}
+
+library(plotly)
+
+# Create a bar chart
+fig <- plot_ly(
+  data = df_top10,
+  x = ~from_station_name,
+  y = ~Counts,
+  type = 'bar',
+  text = ~Counts,
+  width = 1000,
+  height = 550
+)
+
+fig <- fig %>% layout(
+  xaxis = list(title = "From Station Name", categoryorder = "total descending"),
+  yaxis = list(title = "Counts"),
+  title = list(text = "Top 10 'from_station_name'", x = 0.5),
+  hoverinfo = "all",
+  plot_bgcolor = 'black'
+)
+
+# Display the figure
+fig
+
+
+
+```
+
+
+```{r}
+#2 - What is the average number of rides? 
+#-----------------------------------------------------------
+
+library(dplyr)
+
+df_counts <- dTrip %>% 
+  group_by(from_station_name) %>%
+  summarise(Counts = n())
+
+mean_counts <- round(mean(df_counts$Counts), 2)
+
+print(mean_counts)
+
+```
+
+
+```{r}
+#3. What are the Top popular routes?
+#-----------------------------------------------------------
+dfPopularRoutes <- dTrip[c("from_station_name", "to_station_name")]
+
+dfPopularRoutes <- dfPopularRoutes[complete.cases(dfPopularRoutes[, c("from_station_name", "to_station_name")]), ]
+
+dfPopularRoutes$popular_routes <- paste(dfPopularRoutes$from_station_name, "TO", dfPopularRoutes$to_station_name)
+
+dfPopularRoutes <- as.data.frame(table(dfPopularRoutes$popular_routes))
+
+colnames(dfPopularRoutes) <- c("popular_routes", "Counts")
+
+dfPopularRoutes <- dfPopularRoutes[order(-dfPopularRoutes$Counts), ]
+
+dfPopularRoutes <- dfPopularRoutes[1:10, ]
+
+library(ggplot2)
+
+ggplot(dfPopularRoutes, aes(x = popular_routes, y = Counts, text = popular_routes)) +
+  geom_bar(stat = "identity", fill = "#0073e6", color = "black") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1), plot.background = element_rect(fill = "black"), panel.background = element_rect(fill = "black")) +
+  labs(title = "Top 10 Popular Bike Routes", x = "Routes", y = "Counts") +
+  scale_x_discrete(labels = function(x) stringr::str_wrap(x, width = 15)) +
+  geom_text(aes(label = Counts), vjust = -0.5, size = 3) +
+  theme(axis.text = element_text(color = "white"), axis.title = element_text(color = "white"), plot.title = element_text(color = "white"))
+
+```
+
+```{r}
+# 4. What is the Total percentage of Round Trip?
+#-----------------------------------------------------------
+
+dfSameStation <- subset(dTrip, from_station_name == to_station_name)
+
+dfSameStation <- dfSameStation[c("from_station_name", "to_station_name")]
+
+
+```
+
+```{r}
+cat(paste("Total Round Trips: ", nrow(dfSameStation), "\n"))
+cat(paste("Percentage of Round Trips: ", round((nrow(dfSameStation) / nrow(dTrip) * 100), 2), "%\n"))
+```
+
+```{r}
+#4. Data Analysis
+```
+
+```{r}
+#The frequency of service usage by various user types.
+dTrip %>%
+  filter(!is.na(usertype)) %>%
+  group_by(usertype) %>%
+  summarize(trips = n())
+
+```
+
+
+```{r}
+#Analysis: Subscribers are using our service the most.
+
+```
+
+
+```{r}
+#Plotting the above result. 
+dTrip %>%
+  drop_na(usertype) %>%
+  group_by(usertype) %>%
+  summarize(trips = n()) %>%
+  ggplot(aes(usertype, trips)) +
+  geom_col(fill = c('lightblue', 'lightgreen')) +
+  theme_classic() +
+  labs(title = 'Number of trips from April 2019 to March 2020', x = 'User type', y = 'Trips', size = 10) +
+  theme(text = element_text(size = 15))
+
+```
+
+
+```{r}
+#Calculating the number of trips
+dTrip %>%
+  group_by(usertype, gender, day, month) %>%
+  summarize(trips = n()) 
+```
+
+
+```{r}
+# Plot the mumber of trips each day:
+dTrip %>%
+  drop_na(usertype, gender, day, month) %>%
+  group_by(usertype, gender, day, month) %>%
+  summarize(trips = n()) %>%
+  ggplot(aes(x = day, y = trips, fill = usertype)) +
+  geom_col(position = 'dodge') +
+  theme_classic() +
+  scale_fill_manual(values = c('Customer' = 'lightgreen', 'Subscriber' = 'lightblue')) +
+  labs(title = 'Number of Trips by User Type and Gender',
+       x = 'Day',
+       y = 'Number of Trips',
+       size = 10,
+       fill = '') +
+  theme(text = element_text(size = 15))
+
+```
+
+
+```{r}
+# Plot the mumber of trips each month for each user type:
+options(repr.plot.width = 75, repr.plot.height = 15)
+
+dTrip %>% drop_na(usertype, gender, day, month) %>% group_by(usertype, gender, day, month) %>% summarize(trips = n()) %>%
+ggplot(aes(month, trips)) + geom_col(aes(fill = usertype), position = 'dodge') + theme_classic() +
+scale_fill_manual(values = c('Customer' = 'lightgreen', 'Subscriber' = 'lightblue')) +
+labs(title = 'Number of trips from April 2019 to March 2020', x = 'Month', y = 'Trips', size = 75, fill = '') +
+theme(text = element_text(size = 10))
+```
+
+
+```{r}
+# Plot the mumber of trips each day for each user type and gender:
+options(repr.plot.width = 20, repr.plot.height = 10)
+
+dTrip %>% drop_na(usertype, gender, day, month) %>% group_by(usertype, gender, day, month) %>% summarize(trips = n()) %>%
+ggplot(aes(day, trips)) + geom_col(aes(fill = usertype), position = 'dodge') + theme_classic() +
+scale_fill_manual(values = c('Customer' = 'lightgreen', 'Subscriber' = 'lightblue')) + facet_grid(~gender) +
+labs(title = 'Number of trips from April 2019 to March 2020', x = 'Day', y = 'Trips', size = 10, fill = '') +
+theme(text = element_text(size = 10))
+```
+
+
+```{r}
+# Another plot:
+options(repr.plot.width = 25, repr.plot.height = 10)
+
+dTrip %>% drop_na(usertype, gender, day, month) %>% group_by(usertype, gender, day, month) %>% summarize(trips = n()) %>%
+ggplot(aes(month, trips)) + geom_point(aes(col = usertype), size = 4) + theme_classic() + geom_line(aes(month, trips)) +
+scale_color_manual(values = c('Customer' = '#d4599c', 'Subscriber' = '#04b8b5')) +
+labs(title = 'Number of trips from April 2019 to March 2020', x = 'Month', y = 'Trips', size = 10, fill = '') +
+theme(text = element_text(size = 7))
+```
+
+
+```{r}
+# Another plot:
+options(repr.plot.width = 25, repr.plot.height = 10)
+
+dTrip %>% drop_na(usertype, gender, day, month) %>% group_by(usertype, gender, day, month) %>% summarize(trips = n()) %>%
+ggplot(aes(month, trips)) + geom_jitter(aes(col = usertype), size = 4) + theme_classic() + geom_line() +
+scale_color_manual(values = c('Customer' = '#d4599c', 'Subscriber' = '#04b8b5')) +
+labs(title = 'Number of trips from April 2019 to March 2020', x = 'Month', y = 'Trips', size = 10, fill = '') +
+theme(text = element_text(size = 10))
+```
+
+
+```{r}
+# Plot the mumber of trips each birthyear for each user type:
+options(repr.plot.width = 20, repr.plot.height = 10)
+
+dTrip %>% drop_na(usertype, gender, day, month,birthyear) %>% group_by(usertype, gender, day, month,birthyear) %>% summarize(trips = n()) %>%
+ggplot(aes(birthyear, trips)) + geom_col(aes(fill = usertype), position = 'dodge') + theme_classic() +
+scale_fill_manual(values = c('Customer' = 'lightgreen', 'Subscriber' = 'lightblue')) +
+labs(title = 'Number of trips from April 2019 to March 2020', x = 'User birth year', y = 'Trips', size = 10, fill = '')+
+theme(text = element_text(size = 10))
+```
+
+
+```{r}
+#Converting birth year to Age
+dTrip <- mutate(dTrip, age = (2023-birthyear))
+head(dTrip,2)
+```
+
+
+```{r}
+#Re-plotting using 'age'.
+options(repr.plot.width = 20, repr.plot.height = 10)
+
+dTrip %>% drop_na() %>% filter(!(age > 80), !(age < 19)) %>%
+group_by(usertype, gender, day, month,age) %>% summarize(trips = n()) %>%
+ggplot(aes(age, trips)) + geom_col(aes(fill = usertype), position = 'dodge') + theme_classic() +
+scale_fill_manual(values = c('Customer' = 'lightgreen', 'Subscriber' = 'lightblue')) +
+labs(title = 'Number of trips from April 2019 to March 2020', x = 'User age', y = 'Trips', size = 10, fill = '')+
+theme(text = element_text(size = 15))
+```
+
+
+```{r}
+```
+
+
+```{r}
+```
+
+

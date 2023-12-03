@@ -1,0 +1,81 @@
+---
+title: "Divvy"
+author: "Shreyanka Gowdru Chandrashekara"
+date: "2023-11-25"
+output: html_document
+---
+
+```{r}
+q1 <- read.csv('Divvy_Trips_2020_Q1.csv')
+
+```
+
+```{r}
+head(q1)
+```
+
+```{r}
+q2 <- read.csv('Divvy_Trips_2019_Q2.csv')
+q3 <- read.csv('Divvy_Trips_2019_Q3.csv')
+q4 <- read.csv('Divvy_Trips_2019_Q4.csv')
+```
+
+```{r}
+colnames(q1)
+colnames(q2)
+colnames(q3)
+colnames(q4)
+```
+
+```{r}
+library(tidyverse)
+```
+
+```{r}
+q1 <- rename(q1, 
+            trip_id = 'ride_id',
+            start_time = 'started_at',
+            end_time = 'ended_at',
+            from_station_id = 'start_station_id',
+            from_station_name = 'start_station_name',
+            to_station_id = 'end_station_id',
+            to_station_name = 'end_station_name',
+            usertype = 'member_casual')
+```
+
+```{r}
+q2 <- rename(q2, 
+            trip_id = 'X01...Rental.Details.Rental.ID',
+            start_time = 'X01...Rental.Details.Local.Start.Time',
+            end_time = 'X01...Rental.Details.Local.End.Time',
+            bikeid = 'X01...Rental.Details.Bike.ID',
+            tripduration = 'X01...Rental.Details.Duration.In.Seconds.Uncapped',
+            from_station_id = 'X03...Rental.Start.Station.ID',
+            from_station_name = 'X03...Rental.Start.Station.Name',
+            to_station_id = 'X02...Rental.End.Station.ID',
+            to_station_name = 'X02...Rental.End.Station.Name',
+            usertype = 'User.Type',
+            gender = 'Member.Gender',
+            birthyear = 'X05...Member.Details.Member.Birthday.Year')
+```
+
+```{r}
+#fixed the column names as it was not same
+colnames(q1)
+colnames(q2)
+colnames(q3)
+colnames(q4)
+```
+
+```{r}
+#Check if all needed columns have the same data type across the four dataset
+str(q1)
+str(q2)
+str(q3)
+str(q4)
+```
+
+```{r}
+#Datatype of 'trip_id' and 'tripduration' are assigned differently across the datasets (not in the same data type.Let's fix it by changing all datatype of these variables into character. In addition to that, the 'start_time' and 'end_time' are assigned as characters. They need to be covnerted into datetime type. We must consider the format of each date.
+```
+
