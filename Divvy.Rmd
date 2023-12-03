@@ -1,30 +1,12 @@
 ---
-title: "Divvy"
+title: "DivvyAnalysis"
 author: "Shreyanka Gowdru Chandrashekara"
-date: "2023-11-25"
+date: "2023-11-28"
 output: html_document
 ---
 
-```{r}
-q1 <- read.csv('Divvy_Trips_2020_Q1.csv')
-
-```
-
-```{r}
-head(q1)
-```
-
-```{r}
-q2 <- read.csv('Divvy_Trips_2019_Q2.csv')
-q3 <- read.csv('Divvy_Trips_2019_Q3.csv')
-q4 <- read.csv('Divvy_Trips_2019_Q4.csv')
-```
-
-```{r}
-colnames(q1)
-colnames(q2)
-colnames(q3)
-colnames(q4)
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
 ```
 
 ```{r}
@@ -32,50 +14,295 @@ library(tidyverse)
 ```
 
 ```{r}
-q1 <- rename(q1, 
-            trip_id = 'ride_id',
-            start_time = 'started_at',
-            end_time = 'ended_at',
-            from_station_id = 'start_station_id',
-            from_station_name = 'start_station_name',
-            to_station_id = 'end_station_id',
-            to_station_name = 'end_station_name',
-            usertype = 'member_casual')
+library(readr)
+library(ggplot2)
+library(tidyverse)
+library(dplyr)
+library(forcats)
+library(tidyr)
+library(ggmap)
+```
+```{r}
+#1. Data Collection
 ```
 
 ```{r}
-q2 <- rename(q2, 
-            trip_id = 'X01...Rental.Details.Rental.ID',
-            start_time = 'X01...Rental.Details.Local.Start.Time',
-            end_time = 'X01...Rental.Details.Local.End.Time',
-            bikeid = 'X01...Rental.Details.Bike.ID',
-            tripduration = 'X01...Rental.Details.Duration.In.Seconds.Uncapped',
-            from_station_id = 'X03...Rental.Start.Station.ID',
-            from_station_name = 'X03...Rental.Start.Station.Name',
-            to_station_id = 'X02...Rental.End.Station.ID',
-            to_station_name = 'X02...Rental.End.Station.Name',
-            usertype = 'User.Type',
-            gender = 'Member.Gender',
-            birthyear = 'X05...Member.Details.Member.Birthday.Year')
+library(leaflet)
+
+```
+```{r}
+library(purrr)
+
+# List of file paths
+file_paths <- c(
+  "/Users/dell/desktop/divvy_analysis/202108-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202109-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202110-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202111-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202112-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202201-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202202-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202203-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202204-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202205-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202206-divvy-tripdata.csv",
+  "/Users/dell/desktop/divvy_analysis/202207-divvy-tripdata.csv"
+)
+
+# Use purrr::map to read CSV files
+list_of_dataframes <- map(file_paths, read.csv)
+
+# Assign names to the data frames
+names(list_of_dataframes) <- paste0("bs_", format(seq(as.Date("2021-08-01"), by = "1 month", length.out = length(file_paths)), "%m%y"))
+
+# Access individual data frames like bs_0821, bs_0921, etc.
+bs_0821 <- list_of_dataframes$bs_0821
+bs_0921 <- list_of_dataframes$bs_0921
+bs_1021 <- list_of_dataframes$bs_1021
+bs_1121 <- list_of_dataframes$bs_1121
+bs_1221 <- list_of_dataframes$bs_1221
+bs_0122 <- list_of_dataframes$bs_0122
+bs_0222 <- list_of_dataframes$bs_0222
+bs_0322 <- list_of_dataframes$bs_0322
+bs_0422 <- list_of_dataframes$bs_0422
+bs_0522 <- list_of_dataframes$bs_0522
+bs_0622 <- list_of_dataframes$bs_0622
+bs_0722 <- list_of_dataframes$bs_0722
 ```
 
 ```{r}
-#fixed the column names as it was not same
-colnames(q1)
-colnames(q2)
-colnames(q3)
-colnames(q4)
+# Merge the 12 dataset files vertically to create a conslidated dataframe for further cleaning 
+divvy_df<-rbind(bs_0821,bs_0921,bs_1021,bs_1121,bs_1221,bs_0122,bs_0222,bs_0322,bs_0422,bs_0522,bs_0622,bs_0722)
 ```
 
 ```{r}
-#Check if all needed columns have the same data type across the four dataset
-str(q1)
-str(q2)
-str(q3)
-str(q4)
+head(divvy_df)
 ```
 
 ```{r}
-#Datatype of 'trip_id' and 'tripduration' are assigned differently across the datasets (not in the same data type.Let's fix it by changing all datatype of these variables into character. In addition to that, the 'start_time' and 'end_time' are assigned as characters. They need to be covnerted into datetime type. We must consider the format of each date.
+# Checked the merged dataset structure 
+str(divvy_df)
+```
+
+```{r}
+# Install and load the dplyr package
+if (!requireNamespace("dplyr", quietly = TRUE)) {
+  install.packages("dplyr")
+}
+library(dplyr)
+
+# Now you can use glimpse
+glimpse(divvy_df)
+```
+
+```{r}
+# Check the distinct number of ride ID to screen duplicant values 
+n_distinct(divvy_df$ride_id)
+```
+
+```{r}
+#2. Data Cleaning
+```
+
+```{r}
+#Rough idea of number of NA
+count(divvy_df[is.na(divvy_df$start_station_name) | divvy_df$start_station_name == "", ])
+count(divvy_df[is.na(divvy_df$end_station_name) | divvy_df$end_station_name == "", ])
+```
+```{r}
+#3. Analysis
+```
+
+```{r}
+#Basic Statistics
+summary(divvy_df)
+```
+```{r}
+head(divvy_df)
+```
+
+```{r}
+# Plot output size setup
+options(repr.plot.width = 15, repr.plot.height = 15)
+```
+
+```{r}
+#Percentage of member and casual
+percentage <- divvy_df %>% 
+group_by(member_casual) %>% 
+summarise(cnt = n()) %>% 
+mutate(freq=round(cnt/sum(cnt),3)) %>%
+arrange(desc(freq))
+percentage
+```
+
+```{r}
+#Type of bike preference comparison
+# Install and load the ggplot2 package
+if (!requireNamespace("ggplot2", quietly = TRUE)) {
+  install.packages("ggplot2")
+}
+library(ggplot2)
+
+# Now you can create the histogram
+divvy_df.bike_preference <- filter(divvy_df, rideable_type != "docked_bike")
+type.hist <- ggplot(divvy_df.bike_preference, aes(rideable_type, fill = member_casual)) +
+  geom_bar()
+type.hist+ 
+facet_grid(cols = vars(member_casual))+
+scale_fill_manual(values = alpha(c("green", "purple"), 1),name = "User Group")+
+theme(aspect.ratio = 1,text = element_text(size = 15))
+
+```
+```{r}
+colnames(divvy_df)
+```
+
+```{r}
+#Overall frequency and within one day comparison member vs casual
+# Parsing the time stamp
+library(dplyr)
+
+divvy_df <- divvy_df %>% 
+  mutate(hour = format(as.POSIXct(started_at, na.rm = TRUE), format = "%H")) %>% 
+  mutate(day_of_week = format(as.POSIXct(started_at, na.rm = TRUE), format = "%A")) %>% 
+  mutate(month = format(as.POSIXct(started_at, na.rm = TRUE), format = "%m"))
+
+
+```
+
+```{r}
+# Plotting
+day_frequency.hist <- ggplot(divvy_df, aes(hour, fill = member_casual)) + 
+  geom_bar() +
+  facet_grid(~member_casual) +
+  scale_fill_manual(values = alpha(c("green", "purple"), 0.5), name = "User Group") +
+  theme(aspect.ratio = 1, text = element_text(size = 15), axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_continuous(labels = scales::number_format(scale = 1e-3, suffix = "K"))
+
+day_frequency.hist
+```
+
+```{r}
+#Overall frequency and within one week comparison member vs casual
+df_day_order <- divvy_df
+df_day_order$day_of_week <- factor(df_day_order$day_of_week, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+
+week_frequency.hist <- ggplot(df_day_order, aes(x = day_of_week, fill = member_casual)) + 
+  geom_bar() + 
+  theme(axis.text.x = element_text(angle = 45)) +
+  facet_grid(~member_casual) +
+  scale_fill_manual(values = alpha(c("green", "purple"), 0.5), name = "User Group") +
+  theme(aspect.ratio = 1, text = element_text(size = 15)) +
+  scale_y_continuous(labels = scales::number_format(scale = 1e-3, suffix = "K"))
+
+week_frequency.hist
+```
+
+```{r}
+#Overall frequency and within one year comparison member vs casual
+year_frequency.hist <- ggplot(divvy_df , aes(month, fill = member_casual)) + 
+  geom_bar() +
+  facet_grid(~member_casual) +
+  scale_fill_manual(values = alpha(c("green", "purple"), 0.5), name = "User Group") +
+  theme(aspect.ratio = 1, text = element_text(size = 15)) +
+  scale_y_continuous(labels = scales::number_format(scale = 1e-3, suffix = "K"))
+
+year_frequency.hist
+
+```
+
+```{r}
+#Mean and duration within one day comparison
+##Calculating duration of each trip and round up
+divvy_df <- divvy_df %>% mutate(duration = round(difftime(divvy_df$ended_at,divvy_df$started_at, units = "mins"),2))
+```
+
+```{r}
+#Plotting
+options(dplyr.summarise.inform = FALSE)
+day.duration <- divvy_df %>% group_by(hour,member_casual) %>% 
+  summarise(avg_duration_hour = mean(duration,na.rm = T))
+day.duration%>%ggplot(aes(x = hour, y = avg_duration_hour,fill=member_casual)) + geom_bar(stat='identity')+ facet_grid(~member_casual)+
+scale_fill_manual(values = alpha(c("green", "purple"), .5),name = "User Group")+
+theme(aspect.ratio = 1,text = element_text(size = 15),axis.text.x = element_text(angle = 90, hjust = 1))
+```
+
+```{r}
+#Mean and duration within one week comparison
+week.duration <- divvy_df %>% group_by(day_of_week,member_casual) %>% 
+  summarise(avg_duration_day = mean(duration,na.rm = T))
+week.duration$day_of_week <- factor(week.duration$day_of_week, levels = c("Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"))
+week.duration.hist <- ggplot(week.duration,aes(x = day_of_week, y = avg_duration_day,fill=member_casual)) + geom_bar(stat='identity')+
+theme(axis.text.x=element_text(angle=45))+ facet_grid(~member_casual)+scale_fill_manual(values = alpha(c("green", "purple"), .5),name = "User Group")+
+theme(aspect.ratio = 1,text = element_text(size = 15))
+week.duration.hist
+```
+
+```{r}
+#Mean and duration within one year comparison
+year.duration <- divvy_df %>% group_by(month,member_casual) %>% 
+  summarise(avg_duration_month = mean(duration,na.rm = T))
+year.duration.hist <- ggplot(year.duration,aes(x = month, y = avg_duration_month,fill=member_casual)) + geom_bar(stat='identity')+ 
+facet_grid(~member_casual)+scale_fill_manual(values = alpha(c("green", "purple"), .5),name = "User Group")+
+theme(aspect.ratio = 1,text = element_text(size = 15))
+year.duration.hist
+```
+
+```{r}
+#Geographical Pattern
+#Overall usage throughout a day
+
+starttrip<-divvy_df %>% 
+  select(start_station_name,start_lat,start_lng)%>%
+group_by(start_station_name)%>%
+summarize(Latitude = mean(start_lat),Longitude = mean(start_lng),fs=n())
+
+
+leaflet(options = leafletOptions(zoomControl = FALSE,
+                                 minZoom = 10, maxZoom = 13,
+                                 dragging = TRUE)) %>% addTiles() %>% setView(-87.64185, 41.88556, zoom = 11) %>% 
+  addCircleMarkers(data=starttrip,lng = ~Longitude, lat = ~Latitude,label = ~start_station_name,radius= ~sqrt(fs*0.001)) %>% setMaxBounds(
+               lng1 = -88.611,
+               lat1 = 42.253,
+               lng2 = -87.055,
+               lat2 = 41.608)
+```
+
+```{r}
+# Casual vs Member TOP 10 STATIONS
+frequency_start_station <- divvy_df  %>% drop_na(start_station_name)%>% count(start_station_name,member_casual) 
+top_frequency_start_station <- frequency_start_station %>%                                     
+  arrange(desc(n)) %>% 
+  group_by(member_casual) %>%
+  slice(1:10)
+top_frequency_start_station %>%
+  ggplot(aes(x = reorder(start_station_name, n), y = n, fill = member_casual)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90)) +
+  facet_grid(~member_casual, scales = "free_x") +
+  labs(y = "Trip Count", x = "Station Name") +
+  scale_fill_manual(values = alpha(c("green", "purple"), 0.5), name = "User Group") +
+  theme(aspect.ratio = 1, text = element_text(size = 10)) +
+  scale_y_continuous(labels = scales::number_format(scale = 1e-3, suffix = "K"))
+
+```
+
+```{r}
+# Map top 10 stations for each user type
+divvy_df.top <- divvy_df[divvy_df$start_station_name %in% top_frequency_start_station$start_station_name,]
+top_start <- divvy_df.top %>% group_by(start_station_name) %>% summarise(Latitude = mean(start_lat),Longitude = mean(start_lng)) %>% 
+  left_join(top_frequency_start_station, by = "start_station_name") 
+
+pal <- colorFactor(c("green", "purple"), domain = c("casual","member"))
+
+  leaflet(options = leafletOptions(zoomControl = FALSE,
+                                 minZoom = 10, maxZoom = 13,
+                                 dragging = TRUE)) %>% addTiles() %>% setView(-87.64185, 41.88556, zoom = 11) %>% 
+  addCircleMarkers(data=top_start,lng = ~Longitude, lat = ~Latitude,label = ~start_station_name,radius= ~sqrt(n*0.001), stroke = FALSE,  color = ~pal(member_casual),fillOpacity = 0.7) %>%  setMaxBounds(
+               lng1 = -88.611,
+               lat1 = 42.253,
+               lng2 = -87.055,
+               lat2 = 41.608)
 ```
 
