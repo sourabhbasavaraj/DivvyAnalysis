@@ -1,6 +1,6 @@
 ---
 title: "DivvyAnalysis"
-author: "Shreyanka Gowdru Chandrashekara"
+author: "Shreyanka Gowdru Chandrashekara", "Sourabh Sajjan", "Kiran Venkatesh" 
 date: "2023-11-28"
 output: html_document
 ---
